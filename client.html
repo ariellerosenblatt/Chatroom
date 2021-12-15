@@ -1,0 +1,325 @@
+
+<!DOCTYPE html>
+
+<html lang="en">
+   <!-- <head> -->
+      <!-- <link rel="stylesheet" href="style.css"> -->
+
+      <script src="http://code.jquery.com/jquery-latest.js"></script>
+      <script src="/socket.io/socket.io.js"></script>
+      <script>
+            // <script type ="text/javascript">
+
+      var socketio = io.connect();
+      var username = "Annonymous User";
+   //    <- Receive "WELCOME" Actions
+   //  - show list of rooms
+      socketio.on("connect", function(){
+         var paragraph = document.getElementById("conversation");
+        paragraph.innerText = "";
+         username = prompt("Insert name here:");
+         document.getElementById("us").innerHTML = username;
+         if (username == "")
+         {
+            username = "Annonymous User";
+            socketio.emit("addUser", username);
+         }
+         else{
+            socketio.emit("addUser", username);
+         }
+        
+      });
+      
+// <- Receive "NEW_MESSAGE_FROM_ROOM" action
+//     - display the message in the list of message in the room
+      socketio.on("updateConvo", function(infotoUpdate) {
+         var paragraph = document.getElementById("conversation").appendChild(document.createElement("p"));
+         paragraph.style.color = 'gray';
+         paragraph.appendChild(document.createTextNode(infotoUpdate));
+      });
+
+      socketio.on("printUsers", function(stringofUsers) {
+         var pg = document.getElementById("currentUsers").appendChild(document.createElement("p"));
+         pg.style.color = 'red';
+         console.log(stringofUsers);
+         console.log("HII");
+         pg.appendChild(document.createTextNode(stringofUsers));
+      });
+
+
+    socketio.on("messagetoViewer",function(data) {
+         paragraph = document.getElementById('messagetoViewer');
+
+        while (paragraph.firstChild) {
+            paragraph.removeChild(paragraph.firstChild)
+        }
+
+            for (let user of data.listOfUsers) {
+                userText = document.createTextNode(user)
+                paragraph.appendChild(userText);
+                paragraph.appendChild(document.createElement('br'));
+
+            }
+            
+             paragraph.style.color = 'green';
+         
+      });
+
+      socketio.on("errorMessage", function(data){
+         paragraph = document.getElementById('errorMessage');
+         paragraph.style.color = 'red';
+         paragraph.innerText = data;
+       
+      });
+
+
+      socketio.on("roomAdd", function(totalRooms, currentRoom){
+         console.log(totalRooms);
+         $("#roomsss").empty();
+         for(var x=0; x<totalRooms.length; x++){
+            console.log(totalRooms[x]);
+            console.log(currentRoom);
+				if(totalRooms[x].roomName == currentRoom){
+                    $("#roomsss").append("<div><button class='block' style='color:white'>" + totalRooms[x].roomName + "</button></div>");
+                    console.log("HI");
+            }
+            else if(totalRooms[x].hasOwnProperty('password')){
+               console.log("30");
+                  $("#roomsss").append('<div><button onclick="privateRoom(\''+totalRooms[x].roomName+'\')" class="block2">' + totalRooms[x].roomName + '</button></div>');
+            }
+				else{
+               console.log(totalRooms[x].roomName);
+                  $("#roomsss").append('<div><button onclick="switchRooms(\''+totalRooms[x].roomName+'\')" class="block2">' + totalRooms[x].roomName + '</></div>');
+					}
+			}
+      });
+
+      
+      socketio.on("updateRoom", function(totalRooms, currentRoom){
+         $("#roomsss").empty();
+
+			for(var x=0; x<totalRooms.length; x++){
+				if(totalRooms[x].roomName == currentRoom){
+            $("#roomsss").append("<button class='block' style='color:white'>" + totalRooms[x].roomName + "</button></div>");
+            }
+            else{
+               if(totalRooms[x].hasOwnProperty('password')){
+						$("#roomsss").append('<div><button onclick="privateRoom(\''+totalRooms[x].roomName+'\')" class="block2">' + totalRooms[x].roomName + '</button></div>');
+
+                    }
+					else{
+						$("#roomsss").append('<div><button onclick="switchRooms(\''+totalRooms[x].roomName+'\')" class="block2">' + totalRooms[x].roomName + '</></div>');
+					}
+            }
+			}
+      });
+		
+     
+
+		socketio.on("askPW", function(currentRoom){
+			socketio.emit("checkPw", currentRoom, prompt("What's the password to enter this room?"));
+		});
+		
+      socketio.on("output",function(username, data, time) {
+         var publicmessage = document.getElementById("conversation").appendChild(document.createElement("p"));
+         publicmessage.appendChild(document.createTextNode(username+ ": " + data['message'] + " (sent at: " + time + ")"));
+      });
+
+
+		socketio.on("private", function(author, messagetext){
+			var DM = document.getElementById("conversation").appendChild(document.createElement("p"));
+            DM.appendChild(document.createTextNode("~" + author + ": " + messagetext + "~"));
+            DM.style.color = "blue"
+            console.log(author);
+            console.log(messagetext);
+		});
+
+      function switchRooms(room){
+        var paragraph = document.getElementById("conversation");
+        paragraph.innerText = "";
+         socketio.emit('switchRooms', room);
+      }
+		
+		 function privateRoom(room){
+         socketio.emit('privateRoom', room);
+      }
+    
+      
+      function justMoved(){
+         var roomName = document.getElementById("justMoved").value;
+         socketio.emit("roomAdd", roomName);
+			
+      }
+      
+		function kickout(){
+			//HELP KICK
+            var banWhom = document.getElementById("banwho").value;
+            socketio.emit('kickout', banWhom);
+
+		}
+
+        function addPass(){
+			var roomName = document.getElementById("justMoved").value;
+         socketio.emit("addWithPw", roomName, prompt("Set password:"));
+			
+		}
+      
+		
+        function sendMessage(){
+           var current = new Date();
+         var messagetext = document.getElementById("message_input").value;
+         
+         var timee = time();
+         socketio.emit("input", {message:messagetext}, timee);
+         console.log(time()); 
+            document.getElementById("message_input").value = "";
+    
+      }
+
+		socketio.on("emoji", function(emoji){
+         var timee = time();
+         socketio.emit("input", {message:emoji}, timee);
+      });
+
+      function time()
+      {
+        var date = new Date();
+
+        var hours = date.getHours();
+        var minutes = date.getMinutes();
+        var ampm = hours >= 12 ? 'pm' : 'am';
+        hours = hours % 12;
+        hours = hours ? hours : 12; // the hour '0' should be '12'
+        minutes = minutes < 10 ? '0'+minutes : minutes;
+        var strTime = hours + ':' + minutes + ' ' + ampm;
+        return strTime;
+        
+
+      }
+		function ban(){
+			var banWhom = document.getElementById("banwho").value;
+			socketio.emit('ban', banWhom, username);
+		}
+		
+		function privateMessage(){
+			var message = document.getElementById("privatemessage").value;
+			var recipient = document.getElementById("recipient").value;
+			socketio.emit("privateMessage", recipient, message);
+		}
+		
+      </script>
+      <!-- <head> -->
+         <title>
+            Chat Room!
+         </title>
+            <style>
+               .block {
+               display: block;
+               width: 100%;
+               border: none;
+               background-color: lightskyblue;
+               padding: 14px 28px;
+               font-size: 16px;
+               cursor: pointer;
+               text-align: center;
+            }
+      
+            .block2 {
+               display: block;
+               width: 100%;
+               border: none;
+               background-color: gray;
+               padding: 14px 28px;
+               font-size: 16px;
+               cursor: pointer;
+               text-align: center;
+            
+            }
+           
+      
+            .sidebar {
+            height: 100%; /* Full-height: remove this if you want "auto" height */
+            width: 160px; /* Set the width of the sidebar */
+            position: fixed; /* Fixed Sidebar (stay in place on scroll) */
+            z-index: 1; /* Stay on top */
+            top: 0; /* Stay at the top */
+            left: 0;
+            background-color: #111; /* Black */
+            overflow-x: hidden; /* Disable horizontal scroll */
+            padding-top: 20px;
+            }
+      
+            .split {
+            height: 100%;
+            width: 50%;
+            position: fixed;
+            z-index: 1;
+            top: 0;
+            overflow-x: hidden;
+            padding-top: 20px;
+            }
+      
+            /* Control the left side */
+            .left {
+            left: 0;
+            background-color: white;
+            }
+      
+            /* Control the right side */
+            .right {
+            right: 0;
+            background-color: lightskyblue;
+            }
+      
+            </style>
+		</head>
+   <!-- </head> -->
+   <body>
+		<div>
+         <div class = "sidebar"> 
+            <div class="split left"> 
+         <h2 style="text-align:center; color:mediumblue">Welcome <span id="us"></span> !! Choose from rooms below!! </h2>
+			<h2 style="text-align:center">Rooms:</h2>
+         
+         <div id="roomsss"> </div>
+         <br>
+			<h2>Create new room</h2>
+			<input type="text" id="justMoved"/>
+			<button onclick="justMoved()">Create</button>
+			<button onclick="addPass()">Add Password to Room</button>
+			<h2>Want to private message someone? </h2>
+			<div id="private">
+			<label>To: <input type="text" id="recipient"/></label>
+            <br>
+			<label>Message: <input type="text" id="privatemessage"/></label>
+			<button onclick="privateMessage()">Direct Message</button>	
+			</div>
+			<h2>Want to get rid of someone? (Owners only)</h2>
+         <input type="text" id="banwho"/><input>
+         <button onclick="ban()" id="banbutton">Ban</button>	
+         <button onclick="kickout()" id="kickbutton">Kick Out</button>	
+			<div id="kick"></div>
+         <div id="currentUsers"></div>
+
+         <h2> Users in Current Room:</h2>
+         <h4 id="messagetoViewer"> users to print here! </h4>
+         <h4 id="errorMessage">(no errors shown here)</h4>
+         <h4> Commands: /help, /users, /emojis</h4>
+        </div>
+        
+      </div>
+      </div>
+
+      <div class="split right">
+        <div id="message">
+        <label> SEND MESSAGE: </label>
+		<input type="text" id="message_input"/>
+		<button id="messageButton" onclick="sendMessage()">send</button>
+     
+
+		</div>
+      <div id="conversation"></div>
+   </div> 
+   
+   </body>
+</html>
